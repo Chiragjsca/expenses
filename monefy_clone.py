@@ -90,7 +90,7 @@ init_state()
 def fmt(v):
     return f"₹{v:,.2f}"
 
-def go(page, **preset):
+def navigate(page, **preset):
     st.session_state.page = page
     st.session_state.preset_category = preset.get("category")
     st.session_state.preset_kind = preset.get("kind")
@@ -144,7 +144,7 @@ def sidebar():
                     ss.accounts[new_acc] = {"icon": new_icon or "🏦", "balance": 0.0}
                     st.rerun()
             if st.button("↔ Transfer between accounts"):
-                go("new_transfer")
+                navigate("new_transfer")
 
         with st.expander("📗 Categories", expanded=False):
             st.caption("EXPENSES")
@@ -228,7 +228,7 @@ def home_page():
                      f"<span class='monefy-sub'>All accounts</span></span></div>", unsafe_allow_html=True)
     with c2:
         if st.button("↔", help="New transfer"):
-            go("new_transfer")
+            navigate("new_transfer")
 
     st.markdown(f"<p style='text-align:center;color:{GREEN_DARK};margin-top:0'>{label}</p>",
                 unsafe_allow_html=True)
@@ -241,7 +241,7 @@ def home_page():
     for i, (name, icon) in enumerate(cats):
         with cols[i % 4]:
             if st.button(f"{icon}\n{name}", key=f"cat_{name}"):
-                go("new_expense", category=name, kind="expense")
+                navigate("new_expense", category=name, kind="expense")
 
     total_balance = sum(a["balance"] for a in ss.accounts.values())
     st.markdown(f"<div class='balance-bar'>Balance {fmt(total_balance)}</div>", unsafe_allow_html=True)
@@ -250,12 +250,12 @@ def home_page():
     with b1:
         st.markdown("<div class='expense-btn'>", unsafe_allow_html=True)
         if st.button("EXPENSE", use_container_width=True):
-            go("new_expense")
+            navigate("new_expense")
         st.markdown("</div>", unsafe_allow_html=True)
     with b2:
         st.markdown("<div class='income-btn'>", unsafe_allow_html=True)
         if st.button("INCOME", use_container_width=True):
-            go("new_income")
+            navigate("new_income")
         st.markdown("</div>", unsafe_allow_html=True)
 
     if txns:
@@ -325,7 +325,7 @@ def entry_page(kind):
 
     top1, top2 = st.columns([1, 6])
     if top1.button("←", key=f"back_{kind}"):
-        go("home")
+        navigate("home")
     top2.markdown(f"### {title}")
     st.caption(date.today().strftime("%A, %d %B"))
 
@@ -358,7 +358,7 @@ def entry_page(kind):
             else:
                 ss.accounts[account]["balance"] += amount
             ss[f"{kind}_buffer"] = "0"
-            go("home")
+            navigate("home")
 
 # ────────────────────────────────────────────────────────────────────────
 # NEW TRANSFER
@@ -367,7 +367,7 @@ def transfer_page():
     ss = st.session_state
     top1, top2 = st.columns([1, 6])
     if top1.button("←", key="back_transfer"):
-        go("home")
+        navigate("home")
     top2.markdown("### New transfer")
     st.caption(date.today().strftime("%A, %d %B"))
 
@@ -400,7 +400,7 @@ def transfer_page():
                 "amount": amount, "note": note,
             })
             ss["transfer_buffer"] = "0"
-            go("home")
+            navigate("home")
 
 # ────────────────────────────────────────────────────────────────────────
 # ROUTER
