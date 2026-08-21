@@ -184,30 +184,39 @@ def donut_chart(txns):
     total_income = sum(t["amount"] for t in txns if t["kind"] == "income")
     total_expense = sum(t["amount"] for t in txns if t["kind"] == "expense")
 
-    if exp_by_cat:
-        labels = list(exp_by_cat.keys())
-        values = list(exp_by_cat.values())
-        icons = [st.session_state.expense_categories.get(l, "") for l in labels]
-        fig = go.Figure(data=[go.Pie(
-            labels=[f"{i} {l}" for i, l in zip(icons, labels)],
-            values=values, hole=0.55,
-            marker=dict(line=dict(color=BG, width=2)),
-        )])
-    else:
-        fig = go.Figure(data=[go.Pie(labels=["No data"], values=[1], hole=0.55,
-                                      marker=dict(colors=["#CFCFCF"]))])
-        fig.update_traces(textinfo="none", hoverinfo="skip")
+    try:
+        if exp_by_cat:
+            labels = list(exp_by_cat.keys())
+            values = list(exp_by_cat.values())
+            icons = [st.session_state.expense_categories.get(l, "") for l in labels]
+            fig = go.Figure(data=[go.Pie(
+                labels=[f"{i} {l}" for i, l in zip(icons, labels)],
+                values=values,
+                hole=0.55,
+            )])
+        else:
+            # Minimal placeholder pie — avoids version-sensitive kwargs
+            fig = go.Figure(data=[go.Pie(labels=["No data"], values=[1], hole=0.55)])
+            fig.update_traces(textinfo="none", hoverinfo="skip",
+                               marker=dict(colors=["#CFCFCF"]))
 
-    fig.update_layout(
-        showlegend=bool(exp_by_cat), height=340, margin=dict(t=10, b=10, l=10, r=10),
-        annotations=[
-            dict(text=f"<span style='color:{GREEN_DARK}'>{fmt(total_income)}</span>", x=0.5, y=0.56,
-                 font_size=18, showarrow=False),
-            dict(text=f"<span style='color:{RED}'>{fmt(total_expense)}</span>", x=0.5, y=0.44,
-                 font_size=18, showarrow=False),
-        ],
-    )
-    return fig
+        fig.update_layout(
+            showlegend=bool(exp_by_cat), height=340, margin=dict(t=10, b=10, l=10, r=10),
+            annotations=[
+                dict(text=f"<span style='color:{GREEN_DARK}'>{fmt(total_income)}</span>", x=0.5, y=0.56,
+                     font_size=18, showarrow=False),
+                dict(text=f"<span style='color:{RED}'>{fmt(total_expense)}</span>", x=0.5, y=0.44,
+                     font_size=18, showarrow=False),
+            ],
+        )
+        return fig
+    except Exception as e:
+        # Never let a charting hiccup crash the whole app — show the real
+        # error inline (Streamlit Cloud otherwise redacts it) and fall back
+        # to a plain summary so the page still renders.
+        st.error(f"Chart error (please share this so it can be fixed): {type(e).__name__}: {e}")
+        st.write(f"Income: {fmt(total_income)}  |  Expense: {fmt(total_expense)}")
+        return go.Figure()
 
 def home_page():
     ss = st.session_state
