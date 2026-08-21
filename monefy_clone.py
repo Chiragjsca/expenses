@@ -1,11 +1,11 @@
 """
-Monefy-style Expense Tracker — Streamlit Clone
+Expense Tracker — Streamlit App
 ------------------------------------------------
-A single-file Streamlit app that recreates the core flows seen in the
-Monefy budgeting app screenshots:
+A single-file Streamlit budgeting app:
   - Home screen: donut chart of spending by category, category grid,
     balance bar, EXPENSE / INCOME buttons
-  - New expense / New income: numeric keypad + account + category + note
+  - New expense / New income: Windows-Calculator-style keypad + account
+    + category + note
   - New transfer: move money between accounts
   - Accounts drawer: manage accounts, see balances
   - Categories drawer: manage expense & income categories
@@ -14,6 +14,7 @@ Monefy budgeting app screenshots:
 Run with:  streamlit run monefy_clone.py
 """
 
+import re
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -22,33 +23,31 @@ from datetime import date, timedelta
 # ────────────────────────────────────────────────────────────────────────
 # PAGE CONFIG + THEME
 # ────────────────────────────────────────────────────────────────────────
-st.set_page_config(page_title="Monefy", page_icon="💰", layout="centered")
+st.set_page_config(page_title="Expense Tracker", page_icon="💰", layout="centered")
 
 GREEN = "#6FBF8B"
 GREEN_DARK = "#5CAE7A"
 RED = "#E27272"
 BG = "#EAF7EE"
+CALC_BG = "#F3F3F3"
+CALC_BORDER = "#E1E1E1"
+CALC_BLUE = "#0067C0"
 
 st.markdown(f"""
 <style>
     .stApp {{ background-color: {BG}; }}
     div.block-container {{ padding-top: 1rem; max-width: 480px; }}
-    .monefy-header {{
+    .app-header {{
         background-color: {GREEN}; color: white; padding: 14px 18px;
-        border-radius: 8px; font-size: 22px; font-family: cursive;
+        border-radius: 8px; font-size: 22px; font-weight: 600;
         display:flex; justify-content:space-between; align-items:center;
         margin-bottom: 6px;
     }}
-    .monefy-sub {{ font-size:13px; opacity:0.9; }}
+    .app-sub {{ font-size:13px; opacity:0.9; font-weight:400; }}
     .balance-bar {{
         background-color:{GREEN}; color:white; text-align:center;
         padding:14px; border-radius:6px; font-size:18px; font-weight:600;
         margin: 14px 0;
-    }}
-    .amount-box {{
-        background-color:{GREEN}; color:white; text-align:right;
-        padding:22px 16px; border-radius:8px; font-size:34px;
-        border: 1px solid {GREEN_DARK}; margin-bottom: 10px;
     }}
     div.stButton > button {{
         border-radius: 6px; border: 1px solid {GREEN}; color:{GREEN_DARK};
@@ -57,6 +56,34 @@ st.markdown(f"""
     div.stButton > button:hover {{ border-color:{GREEN_DARK}; color:white; background-color:{GREEN}; }}
     .expense-btn button {{ border-color:{RED} !important; color:{RED} !important; }}
     .income-btn button {{ border-color:{GREEN} !important; color:{GREEN_DARK} !important; }}
+
+    /* ---- Windows-Calculator-style keypad ---- */
+    .calc-wrap {{
+        background-color:{CALC_BG}; border:1px solid {CALC_BORDER};
+        border-radius:8px; padding:14px 14px 4px 14px; margin-bottom:10px;
+    }}
+    .calc-title {{ font-size:20px; font-weight:600; color:#1B1B1B; margin-bottom:6px; }}
+    .calc-display {{
+        text-align:right; font-size:44px; font-weight:400; color:#1B1B1B;
+        padding: 10px 4px 4px 4px; min-height:56px; word-break:break-all;
+    }}
+    .calc-memrow {{
+        display:flex; justify-content:space-between; color:#B0B0B0;
+        font-size:14px; padding: 6px 2px 10px 2px; border-bottom:1px solid {CALC_BORDER};
+        margin-bottom:8px;
+    }}
+    .calc-wrap div.stButton > button {{
+        width:100%; height:52px; border-radius:6px; border:none;
+        background-color:#FFFFFF; color:#1B1B1B; font-size:17px;
+        box-shadow: 0 0 0 1px {CALC_BORDER} inset;
+    }}
+    .calc-wrap div.stButton > button:hover {{
+        background-color:#E9E9E9; color:#1B1B1B; box-shadow:0 0 0 1px {CALC_BORDER} inset;
+    }}
+    .calc-eq div.stButton > button {{
+        background-color:{CALC_BLUE} !important; color:white !important;
+    }}
+    .calc-eq div.stButton > button:hover {{ background-color:#00559C !important; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -224,8 +251,8 @@ def home_page():
 
     c1, c2 = st.columns([5, 1])
     with c1:
-        st.markdown(f"<div class='monefy-header'><span><i>Monefy</i><br>"
-                     f"<span class='monefy-sub'>All accounts</span></span></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='app-header'><span>💰 Expense Tracker<br>"
+                     f"<span class='app-sub'>All accounts</span></span></div>", unsafe_allow_html=True)
     with c2:
         if st.button("↔", help="New transfer"):
             navigate("new_transfer")
@@ -269,49 +296,101 @@ def home_page():
         st.info("There are no records for this period yet.")
 
 # ────────────────────────────────────────────────────────────────────────
-# KEYPAD (calculator-style amount entry, like the screenshots)
+# KEYPAD — styled like the Windows Calculator "Standard" view
 # ────────────────────────────────────────────────────────────────────────
 def keypad(key_prefix):
     ss = st.session_state
     buf_key = f"{key_prefix}_buffer"
     ss.setdefault(buf_key, "0")
 
-    st.markdown(f"<div class='amount-box'>{ss[buf_key]}</div>", unsafe_allow_html=True)
+    st.markdown("<div class='calc-wrap'>", unsafe_allow_html=True)
+    st.markdown("<div class='calc-title'>☰ &nbsp; Standard</div>", unsafe_allow_html=True)
+    st.markdown("<div class='calc-memrow'><span>MC &nbsp; MR &nbsp; M+ &nbsp; M− &nbsp; MS</span><span>M▾</span></div>",
+                unsafe_allow_html=True)
+    st.markdown(f"<div class='calc-display'>{ss[buf_key]}</div>", unsafe_allow_html=True)
 
-    rows = [["1", "2", "3", "+"], ["4", "5", "6", "-"],
-            ["7", "8", "9", "×"], [".", "0", "=", "÷"]]
-    for r in rows:
-        cols = st.columns(4)
-        for i, label in enumerate(r):
-            if cols[i].button(label, key=f"{key_prefix}_{label}_{r.index(label)}_{rows.index(r)}"):
+    def row(labels, eq_col=None):
+        cols = st.columns(len(labels))
+        for i, label in enumerate(labels):
+            target_col = cols[i]
+            if eq_col == i:
+                target_col.markdown("<div class='calc-eq'>", unsafe_allow_html=True)
+            if target_col.button(label, key=f"{key_prefix}_{label}_{id(labels)}_{i}"):
                 _keypad_press(buf_key, label)
                 st.rerun()
-    if st.button("⌫ Clear", key=f"{key_prefix}_clear"):
-        ss[buf_key] = "0"
-        st.rerun()
+            if eq_col == i:
+                target_col.markdown("</div>", unsafe_allow_html=True)
+
+    row(["%", "CE", "C", "⌫"])
+    row(["¹⁄x", "x²", "²√x", "÷"])
+    row(["7", "8", "9", "×"])
+    row(["4", "5", "6", "−"])
+    row(["1", "2", "3", "+"])
+    row(["+/-", "0", ".", "="], eq_col=3)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 def _keypad_press(buf_key, label):
     ss = st.session_state
     cur = ss[buf_key]
+    ops = {"+": "+", "−": "-", "×": "*", "÷": "/"}
+
     if label == "=":
         try:
-            expr = cur.replace("×", "*").replace("÷", "/")
+            expr = cur
+            for sym, py in ops.items():
+                expr = expr.replace(sym, py)
             result = eval(expr, {"__builtins__": {}}, {})
             ss[buf_key] = str(round(float(result), 2))
         except Exception:
             ss[buf_key] = "0"
-    elif label in ("+", "-", "×", "÷"):
+    elif label == "C":
+        ss[buf_key] = "0"
+    elif label == "CE":
+        ss[buf_key] = "0"
+    elif label == "⌫":
+        ss[buf_key] = cur[:-1] if len(cur) > 1 else "0"
+    elif label == "+/-":
+        if cur.startswith("-"):
+            ss[buf_key] = cur[1:]
+        elif cur not in ("0", ""):
+            ss[buf_key] = "-" + cur
+    elif label == "%":
+        try:
+            ss[buf_key] = str(round(float(cur) / 100, 4))
+        except Exception:
+            pass
+    elif label == "¹⁄x":
+        try:
+            ss[buf_key] = str(round(1 / float(cur), 6))
+        except Exception:
+            pass
+    elif label == "x²":
+        try:
+            ss[buf_key] = str(round(float(cur) ** 2, 4))
+        except Exception:
+            pass
+    elif label == "²√x":
+        try:
+            ss[buf_key] = str(round(float(cur) ** 0.5, 6))
+        except Exception:
+            pass
+    elif label in ("+", "−", "×", "÷"):
         ss[buf_key] = cur + label
     elif label == ".":
-        ss[buf_key] = cur + "."
+        last_segment = re.split(r"[+\-*/]", cur)[-1]
+        if "." not in last_segment:
+            ss[buf_key] = cur + "."
     else:  # digit
         ss[buf_key] = label if cur == "0" else cur + label
 
 def current_amount(key_prefix):
     raw = st.session_state.get(f"{key_prefix}_buffer", "0")
     try:
-        expr = raw.replace("×", "*").replace("÷", "/")
-        return float(eval(expr, {"__builtins__": {}}, {}))
+        expr = raw
+        for sym, py in {"+": "+", "−": "-", "×": "*", "÷": "/"}.items():
+            expr = expr.replace(sym, py)
+        return abs(float(eval(expr, {"__builtins__": {}}, {})))
     except Exception:
         return 0.0
 
